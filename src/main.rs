@@ -260,7 +260,7 @@ async fn handle_request(
 
     let resp = match client.request::<Vec<u8>>(raw_request).await {
         Ok(resp) => resp,
-        Err(e) => {   
+        Err(e) => {
             if let TwilightErrorType::Response { status, body, .. } = e.kind() {
                 #[cfg(feature = "expose-metrics")]
                 let end = Instant::now();
