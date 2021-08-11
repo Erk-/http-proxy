@@ -260,11 +260,11 @@ async fn handle_request(
 
     let resp = match client.request::<Vec<u8>>(raw_request).await {
         Ok(resp) => resp,
-        Err(e) => {
-            #[cfg(feature = "expose-metrics")]
-            if let TwilightErrorType::Response { status, .. } = e.kind() {
+        Err(e) => {   
+            if let TwilightErrorType::Response { status, body, .. } = e.kind() {
+                #[cfg(feature = "expose-metrics")]
                 let end = Instant::now();
-
+                #[cfg(feature = "expose-metrics")]
                 histogram!(
                     METRIC_KEY.as_str(),
                     end - start,
@@ -272,6 +272,19 @@ async fn handle_request(
                     "route"=>p,
                     "status"=>status.to_string(),
                 );
+
+                let response_builder =
+                    Response::builder().status(StatusCode::from_u16(status.raw()).unwrap());
+
+                let body = body.clone();
+                let reply = match response_builder.body(body.into()) {
+                    Ok(response) => response,
+                    Err(e) => {
+                        error!("Failed to re-assemble body to reply with: {}", e);
+                        return Err(RequestError::ResponseAssembly { source: e });
+                    }
+                };
+                return Ok(reply);
             }
             error!("Failed to receive reply body: {:?}", e);
             return Err(RequestError::RequestIssue { source: e });
